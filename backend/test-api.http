@@ -1,0 +1,145 @@
+### Backend API Testing
+### Gunakan REST Client extension di VS Code
+
+@baseUrl = https://web-production-47eb.up.railway.app
+# @baseUrl = http://localhost:3000
+
+### 1. Health Check
+GET {{baseUrl}}/
+
+### 2. Get Latest Data
+GET {{baseUrl}}/api/data/latest
+
+### 3. Get Data History (default 50)
+GET {{baseUrl}}/api/data/history
+
+### 4. Get Data History (limit 10)
+GET {{baseUrl}}/api/data/history?limit=10
+
+### 5. Get Status History
+GET {{baseUrl}}/api/status/history
+
+### 6. Get Server Statistics
+GET {{baseUrl}}/api/stats
+
+### 7. Test Database Connection
+GET {{baseUrl}}/api/database/test
+
+### 8. Initialize Database (run once)
+POST {{baseUrl}}/api/database/init
+
+### ========================================
+### CONTROL COMMANDS - SYSTEM
+### ========================================
+
+### 9. START Pengeringan
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "START"
+}
+
+### 10. RESET ke Ready Mode
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "RESET"
+}
+
+### ========================================
+### CONTROL COMMANDS - RELAY
+### ========================================
+
+### 11. HEATER ON
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "HEATER_ON"
+}
+
+### 12. HEATER OFF
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "HEATER_OFF"
+}
+
+### 13. FAN ON
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "FAN_ON"
+}
+
+### 14. FAN OFF
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "FAN_OFF"
+}
+
+### 15. LAMP ON
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "LAMP_ON"
+}
+
+### 16. LAMP OFF
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "LAMP_OFF"
+}
+
+### 17. EXHAUST ON
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "EXHAUST_ON"
+}
+
+### 18. EXHAUST OFF
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "EXHAUST_OFF"
+}
+
+### ========================================
+### MAINTENANCE
+### ========================================
+
+### 19. Clear History
+DELETE {{baseUrl}}/api/history/clear
+
+### ========================================
+### ERROR TESTING
+### ========================================
+
+### 20. Invalid Command (should fail)
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{
+  "command": "INVALID_COMMAND"
+}
+
+### 21. Missing Command (should fail)
+POST {{baseUrl}}/api/control
+Content-Type: application/json
+
+{}
+
+### 22. 404 Not Found
+GET {{baseUrl}}/api/invalid-endpoint
