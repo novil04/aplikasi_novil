@@ -107,7 +107,8 @@ mqttClient.on('connect', () => {
   mqttClient.subscribe([
     MQTT_TOPICS.data,
     MQTT_TOPICS.status,
-    MQTT_TOPICS.button
+    MQTT_TOPICS.button,
+    MQTT_TOPICS.control
   ], (err) => {
     if (err) {
       console.error('❌ Failed to subscribe:', err);
@@ -116,6 +117,7 @@ mqttClient.on('connect', () => {
       console.log('   -', MQTT_TOPICS.data);
       console.log('   -', MQTT_TOPICS.status);
       console.log('   -', MQTT_TOPICS.button);
+      console.log('   -', MQTT_TOPICS.control);
     }
   });
 });
@@ -224,6 +226,44 @@ mqttClient.on('message', async (topic, message) => {
       console.error('❌ Failed to save button event:', dbError.message);
     }
   }
+  
+  // =====================================================
+  // TOPIC: novil/pengering/control
+  // Format: "STATUS:HEATER_ON", "HEATER_ON", "FAN_OFF", dll
+  // =====================================================
+  if (topic === MQTT_TOPICS.control) {
+    console.log('🎛️  Control Message:', msg);
+    
+    // Jika pesan dimulai dengan "STATUS:", ini adalah feedback dari ESP32
+    if (msg.startsWith('STATUS:')) {
+      const statusMsg = msg.replace('STATUS:', '');
+      console.log('📊 Relay Status Update:', statusMsg);
+      
+      // Update relay state di latestData
+      if (statusMsg === 'HEATER_ON') latestData.relay1 = true;
+      else if (statusMsg === 'HEATER_OFF') latestData.relay1 = false;
+      else if (statusMsg === 'FAN_ON') latestData.relay2 = true;
+      else if (statusMsg === 'FAN_OFF') latestData.relay2 = false;
+      else if (statusMsg === 'EXHAUST_ON') latestData.relay3 = true;
+      else if (statusMsg === 'EXHAUST_OFF') latestData.relay3 = false;
+      
+      // Save status update to status_history
+      try {
+        await db.insertStatusHistory(`RELAY: ${statusMsg}`);
+        console.log('✅ Relay status saved to MySQL database');
+      } catch (dbError) {
+        console.error('❌ Failed to save relay status:', dbError.message);
+      }
+    } else {
+      // Ini adalah command dari API/Flutter, simpan ke control_commands
+      try {
+        await db.insertControlCommand(msg, 'MQTT');
+        console.log('✅ Control command saved to MySQL database');
+      } catch (dbError) {
+        console.error('❌ Failed to save control command:', dbError.message);
+      }
+    }
+  }
 });
 
 // =====================================================
@@ -328,6 +368,44 @@ aedes.on('publish', async (packet, client) => {
         await db.insertStatusHistory(`BUTTON: ${message}`);
       } catch (dbError) {
         console.error('❌ Failed to save button event:', dbError.message);
+      }
+    }
+    
+    // =====================================================
+    // TOPIC: novil/pengering/control
+    // Format: "STATUS:HEATER_ON", "HEATER_ON", "FAN_OFF", dll
+    // =====================================================
+    if (topic === 'novil/pengering/control') {
+      console.log('🎛️  Control Message:', message);
+      
+      // Jika pesan dimulai dengan "STATUS:", ini adalah feedback dari ESP32
+      if (message.startsWith('STATUS:')) {
+        const statusMsg = message.replace('STATUS:', '');
+        console.log('📊 Relay Status Update:', statusMsg);
+        
+        // Update relay state di latestData
+        if (statusMsg === 'HEATER_ON') latestData.relay1 = true;
+        else if (statusMsg === 'HEATER_OFF') latestData.relay1 = false;
+        else if (statusMsg === 'FAN_ON') latestData.relay2 = true;
+        else if (statusMsg === 'FAN_OFF') latestData.relay2 = false;
+        else if (statusMsg === 'EXHAUST_ON') latestData.relay3 = true;
+        else if (statusMsg === 'EXHAUST_OFF') latestData.relay3 = false;
+        
+        // Save status update to status_history
+        try {
+          await db.insertStatusHistory(`RELAY: ${statusMsg}`);
+          console.log('✅ Relay status saved to database');
+        } catch (dbError) {
+          console.error('❌ Failed to save relay status:', dbError.message);
+        }
+      } else {
+        // Ini adalah command dari API/Flutter, simpan ke control_commands
+        try {
+          await db.insertControlCommand(message, 'MQTT');
+          console.log('✅ Control command saved to database');
+        } catch (dbError) {
+          console.error('❌ Failed to save control command:', dbError.message);
+        }
       }
     }
   }
