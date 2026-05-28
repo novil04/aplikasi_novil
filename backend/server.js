@@ -375,8 +375,8 @@ if (process.env.ENABLE_MQTT_BROKER === 'true') {
 app.get('/', (req, res) => {
   res.json({
     status: 'OK',
-    message: 'Pengering Ikan Backend Server',
-    version: '1.0.0',
+    message: 'Pengering Ikan Backend Server - MQTT Client Enabled',
+    version: '1.0.1',
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
