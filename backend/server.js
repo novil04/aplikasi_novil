@@ -250,15 +250,23 @@ mqttClient.on('message', async (topic, message) => {
       // Save status update to status_history
       try {
         await db.insertStatusHistory(`RELAY: ${statusMsg}`);
-        console.log('✅ Relay status saved to MySQL database');
+        console.log('✅ Relay status saved to status_history');
       } catch (dbError) {
         console.error('❌ Failed to save relay status:', dbError.message);
+      }
+      
+      // Save juga ke control_commands dengan source ESP32
+      try {
+        await db.insertControlCommand(statusMsg, 'ESP32');
+        console.log('✅ Relay status saved to control_commands');
+      } catch (dbError) {
+        console.error('❌ Failed to save to control_commands:', dbError.message);
       }
     } else {
       // Ini adalah command dari API/Flutter, simpan ke control_commands
       try {
         await db.insertControlCommand(msg, 'MQTT');
-        console.log('✅ Control command saved to MySQL database');
+        console.log('✅ Control command saved to control_commands');
       } catch (dbError) {
         console.error('❌ Failed to save control command:', dbError.message);
       }
