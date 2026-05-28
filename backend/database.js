@@ -173,7 +173,12 @@ async function insertSensorData(data) {
 async function getLatestSensorData() {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM sensor_data ORDER BY timestamp DESC LIMIT 1'
+      `SELECT 
+        id, suhu, berat, target, relay1, relay2, relay3, relay4, status,
+        CONVERT_TZ(timestamp, '+00:00', '+07:00') as timestamp
+       FROM sensor_data 
+       ORDER BY timestamp DESC 
+       LIMIT 1`
     );
     return rows[0] || null;
   } catch (error) {
@@ -186,7 +191,12 @@ async function getLatestSensorData() {
 async function getSensorDataHistory(limit = 50) {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM sensor_data ORDER BY timestamp DESC LIMIT ?',
+      `SELECT 
+        id, suhu, berat, target, relay1, relay2, relay3, relay4, status,
+        CONVERT_TZ(timestamp, '+00:00', '+07:00') as timestamp
+       FROM sensor_data 
+       ORDER BY timestamp DESC 
+       LIMIT ?`,
       [limit]
     );
     return rows;
@@ -218,7 +228,12 @@ async function insertStatusHistory(message) {
 async function getStatusHistory(limit = 50) {
   try {
     const [rows] = await pool.query(
-      'SELECT * FROM status_history ORDER BY timestamp DESC LIMIT ?',
+      `SELECT 
+        id, message,
+        CONVERT_TZ(timestamp, '+00:00', '+07:00') as timestamp
+       FROM status_history 
+       ORDER BY timestamp DESC 
+       LIMIT ?`,
       [limit]
     );
     return rows;

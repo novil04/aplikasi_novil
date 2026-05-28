@@ -146,6 +146,10 @@ mqttClient.on('message', async (topic, message) => {
     try {
       const data = JSON.parse(msg);
       
+      // Get current time in WIB (UTC+7)
+      const now = new Date();
+      const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
+      
       // Update latestData dengan data dari ESP32
       latestData = {
         suhu: data.suhu || 0,
@@ -156,7 +160,7 @@ mqttClient.on('message', async (topic, message) => {
         relay3: latestData.relay3 || false,
         relay4: latestData.relay4 || false,
         status: latestData.status, // Keep current status
-        timestamp: new Date().toISOString()
+        timestamp: wibTime.toISOString()
       };
       
       // Save to database
