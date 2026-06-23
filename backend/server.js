@@ -142,7 +142,7 @@ mqttClient.on('message', async (topic, message) => {
   
   // =====================================================
   // TOPIC: novil/pengering/data
-  // Format: {"suhu":28.5,"berat":450,"target":315}
+  // Format: {"suhu":28.5,"berat":450,"target":315,"relay1":true,"relay2":true,"relay3":true,"relay4":false}
   // =====================================================
   if (topic === MQTT_TOPICS.data) {
     try {
@@ -152,15 +152,15 @@ mqttClient.on('message', async (topic, message) => {
       const now = new Date();
       const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
       
-      // Update latestData dengan data dari ESP32
+      // Update latestData dengan data dari ESP32 (termasuk status relay)
       latestData = {
         suhu: data.suhu || 0,
         berat: data.berat || 0,
         target: data.target || 0,
-        relay1: latestData.relay1 || false, // Keep current relay status
-        relay2: latestData.relay2 || false,
-        relay3: latestData.relay3 || false,
-        relay4: latestData.relay4 || false,
+        relay1: data.relay1 !== undefined ? data.relay1 : latestData.relay1, // Update dari ESP32
+        relay2: data.relay2 !== undefined ? data.relay2 : latestData.relay2,
+        relay3: data.relay3 !== undefined ? data.relay3 : latestData.relay3,
+        relay4: data.relay4 !== undefined ? data.relay4 : latestData.relay4,
         status: latestData.status, // Keep current status
         timestamp: wibTime.toISOString()
       };
@@ -299,21 +299,21 @@ aedes.on('publish', async (packet, client) => {
     
     // =====================================================
     // TOPIC: novil/pengering/data
-    // Format: {"suhu":28.5,"berat":450,"target":315}
+    // Format: {"suhu":28.5,"berat":450,"target":315,"relay1":true,"relay2":true,"relay3":true,"relay4":false}
     // =====================================================
     if (topic === 'novil/pengering/data') {
       try {
         const data = JSON.parse(message);
         
-        // Update latestData dengan data dari ESP32
+        // Update latestData dengan data dari ESP32 (termasuk status relay)
         latestData = {
           suhu: data.suhu || 0,
           berat: data.berat || 0,
           target: data.target || 0,
-          relay1: latestData.relay1 || false, // Keep current relay status
-          relay2: latestData.relay2 || false,
-          relay3: latestData.relay3 || false,
-          relay4: latestData.relay4 || false,
+          relay1: data.relay1 !== undefined ? data.relay1 : latestData.relay1, // Update dari ESP32
+          relay2: data.relay2 !== undefined ? data.relay2 : latestData.relay2,
+          relay3: data.relay3 !== undefined ? data.relay3 : latestData.relay3,
+          relay4: data.relay4 !== undefined ? data.relay4 : latestData.relay4,
           status: latestData.status, // Keep current status
           timestamp: new Date().toISOString()
         };

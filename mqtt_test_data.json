@@ -1,0 +1,151 @@
+{
+  "description": "File ini berisi contoh data untuk testing MQTT dengan MQTTX",
+  "broker": {
+    "host": "broker.hivemq.com",
+    "port": 1883,
+    "clientId": "mqttx_test_client"
+  },
+  "topics": {
+    "data": "novil/pengering/data",
+    "status": "novil/pengering/status",
+    "control": "novil/pengering/control"
+  },
+  "test_payloads": {
+    "data_examples": [
+      {
+        "description": "Data saat pengeringan berjalan",
+        "topic": "novil/pengering/data",
+        "payload": {
+          "suhu": 45.2,
+          "berat": 350.0,
+          "target": 280.0,
+          "relay1": "ON",
+          "relay2": "ON",
+          "relay3": "ON",
+          "relay4": "OFF",
+          "status": "BERJALAN"
+        }
+      },
+      {
+        "description": "Data saat suhu tinggi",
+        "topic": "novil/pengering/data",
+        "payload": {
+          "suhu": 65.5,
+          "berat": 320.0,
+          "target": 280.0,
+          "relay1": "ON",
+          "relay2": "ON",
+          "relay3": "ON",
+          "relay4": "ON",
+          "status": "BERJALAN"
+        }
+      },
+      {
+        "description": "Data saat pengeringan selesai",
+        "topic": "novil/pengering/data",
+        "payload": {
+          "suhu": 42.0,
+          "berat": 280.0,
+          "target": 280.0,
+          "relay1": "OFF",
+          "relay2": "OFF",
+          "relay3": "OFF",
+          "relay4": "ON",
+          "status": "SELESAI"
+        }
+      },
+      {
+        "description": "Data saat ready mode",
+        "topic": "novil/pengering/data",
+        "payload": {
+          "suhu": 28.5,
+          "berat": 0.0,
+          "target": 0.0,
+          "relay1": "OFF",
+          "relay2": "OFF",
+          "relay3": "OFF",
+          "relay4": "OFF",
+          "status": "START"
+        }
+      }
+    ],
+    "status_examples": [
+      {
+        "description": "Status pengeringan dimulai",
+        "topic": "novil/pengering/status",
+        "payload": "PENGERINGAN DIMULAI"
+      },
+      {
+        "description": "Status pengeringan selesai",
+        "topic": "novil/pengering/status",
+        "payload": "PENGERINGAN SELESAI"
+      },
+      {
+        "description": "Status ESP32 connected",
+        "topic": "novil/pengering/status",
+        "payload": "ESP32 CONNECTED"
+      },
+      {
+        "description": "Status reset",
+        "topic": "novil/pengering/status",
+        "payload": "RESET READY MODE"
+      },
+      {
+        "description": "Status error DHT",
+        "topic": "novil/pengering/status",
+        "payload": "DHT ERROR"
+      }
+    ],
+    "control_examples": [
+      {
+        "description": "Nyalakan heater",
+        "topic": "novil/pengering/control",
+        "payload": "HEATER_ON"
+      },
+      {
+        "description": "Matikan heater",
+        "topic": "novil/pengering/control",
+        "payload": "HEATER_OFF"
+      },
+      {
+        "description": "Nyalakan fan",
+        "topic": "novil/pengering/control",
+        "payload": "FAN_ON"
+      },
+      {
+        "description": "Matikan fan",
+        "topic": "novil/pengering/control",
+        "payload": "FAN_OFF"
+      },
+      {
+        "description": "Nyalakan lamp",
+        "topic": "novil/pengering/control",
+        "payload": "LAMP_ON"
+      },
+      {
+        "description": "Matikan lamp",
+        "topic": "novil/pengering/control",
+        "payload": "LAMP_OFF"
+      },
+      {
+        "description": "Nyalakan exhaust",
+        "topic": "novil/pengering/control",
+        "payload": "EXHAUST_ON"
+      },
+      {
+        "description": "Matikan exhaust",
+        "topic": "novil/pengering/control",
+        "payload": "EXHAUST_OFF"
+      }
+    ]
+  },
+  "testing_steps": [
+    "1. Buka MQTTX dan connect ke broker.hivemq.com:1883",
+    "2. Subscribe ke topic 'novil/pengering/#' untuk melihat semua messages",
+    "3. Jalankan aplikasi Flutter",
+    "4. Publish test data ke topic 'novil/pengering/data' dengan payload dari data_examples",
+    "5. Publish status ke topic 'novil/pengering/status' dengan payload dari status_examples",
+    "6. Dari aplikasi Flutter, toggle relay dan lihat message di topic 'novil/pengering/control'",
+    "7. Simulasikan ESP32 dengan subscribe ke 'novil/pengering/control' di MQTTX"
+  ]
+}
