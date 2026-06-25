@@ -147,6 +147,12 @@ async function insertSensorData(data) {
       mysqlTimestamp = date.toISOString().slice(0, 19).replace('T', ' ');
     }
     
+    // Convert boolean to integer (1 or 0) for MySQL
+    const relay1 = data.relay1 ? 1 : 0;
+    const relay2 = data.relay2 ? 1 : 0;
+    const relay3 = data.relay3 ? 1 : 0;
+    const relay4 = data.relay4 ? 1 : 0;
+    
     const [result] = await pool.query(
       `INSERT INTO sensor_data (suhu, berat, target, relay1, relay2, relay3, relay4, status, timestamp) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -154,10 +160,10 @@ async function insertSensorData(data) {
         data.suhu || 0,
         data.berat || 0,
         data.target || 0,
-        data.relay1 || false,
-        data.relay2 || false,
-        data.relay3 || false,
-        data.relay4 || false,
+        relay1,
+        relay2,
+        relay3,
+        relay4,
         data.status || 'DISCONNECTED',
         mysqlTimestamp
       ]
