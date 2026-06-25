@@ -1,5 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -57,29 +58,43 @@ class NotificationService {
     required String title,
     required String body,
     String? payload,
+    bool playSound = true,
+    bool showBadge = true,
   }) async {
     if (!_initialized) {
       await initialize();
     }
 
-    const androidDetails = AndroidNotificationDetails(
+    final androidDetails = AndroidNotificationDetails(
       'pengering_ikan_channel',
       'Pengering Ikan',
       channelDescription: 'Notifikasi untuk sistem pengering ikan',
-      importance: Importance.high,
-      priority: Priority.high,
+      importance: Importance.max,
+      priority: Priority.max,
       showWhen: true,
       enableVibration: true,
-      playSound: true,
+      playSound: playSound,
+      enableLights: true,
+      color: const Color(0xFF2196F3),
+      ledColor: const Color(0xFF2196F3),
+      ledOnMs: 1000,
+      ledOffMs: 500,
+      ongoing: false,
+      autoCancel: true,
+      channelShowBadge: showBadge,
+      visibility: NotificationVisibility.public,
+      fullScreenIntent: true,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: 'default',
+      badgeNumber: 1,
     );
 
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
@@ -92,51 +107,31 @@ class NotificationService {
         details,
         payload: payload,
       );
-      print('📱 Notification shown: $title');
+      print('📱 Notification shown: $title - $body');
     } catch (e) {
       print('❌ Error showing notification: $e');
     }
   }
 
-  // Show notification for pengeringan dimulai
-  Future<void> notifyPengeringanDimulai() async {
-    await showNotification(
-      id: 1,
-      title: '🚀 Pengeringan Dimulai',
-      body: 'Proses pengeringan ikan telah dimulai',
-      payload: 'pengeringan_dimulai',
-    );
-  }
-
-  // Show notification for ikan terdeteksi
-  Future<void> notifyIkanTerdeteksi(double berat) async {
-    await showNotification(
-      id: 2,
-      title: '🐟 Ikan Terdeteksi',
-      body: 'Berat ikan: ${berat.toStringAsFixed(0)} gram',
-      payload: 'ikan_terdeteksi',
-    );
-  }
-
-  // Show notification for pengeringan berjalan
-  Future<void> notifyPengeringanBerjalan(double berat, double target) async {
-    double progress = ((1 - (berat - target) / (berat - target)) * 100).clamp(0, 100);
-    await showNotification(
-      id: 3,
-      title: '⏳ Pengeringan Berjalan',
-      body: 'Berat: ${berat.toStringAsFixed(0)}g | Target: ${target.toStringAsFixed(0)}g',
-      payload: 'pengeringan_berjalan',
-    );
-  }
-
   // Show notification for pengeringan selesai
   Future<void> notifyPengeringanSelesai(double beratAkhir) async {
-    await showNotification(
-      id: 4,
-      title: '✅ Pengeringan Selesai',
-      body: 'Target tercapai! Berat akhir: ${beratAkhir.toStringAsFixed(0)} gram',
-      payload: 'pengeringan_selesai',
-    );
+    print('🔔 NotificationService: Showing pengeringan selesai notification');
+    print('   Initialized: $_initialized');
+    print('   Berat akhir: $beratAkhir');
+    
+    try {
+      await showNotification(
+        id: 4,
+        title: '✅ Pengeringan Selesai',
+        body: 'Target tercapai! Berat akhir: ${beratAkhir.toStringAsFixed(0)} gram',
+        payload: 'pengeringan_selesai',
+        playSound: true,
+        showBadge: true,
+      );
+      print('✅ NotificationService: Notification sent successfully');
+    } catch (e) {
+      print('❌ NotificationService: Error sending notification: $e');
+    }
   }
 
   // Show notification for suhu tinggi

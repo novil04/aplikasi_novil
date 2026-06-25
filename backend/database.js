@@ -153,6 +153,16 @@ async function insertSensorData(data) {
     const relay3 = data.relay3 ? 1 : 0;
     const relay4 = data.relay4 ? 1 : 0;
     
+    // Debug logging
+    console.log('📝 Inserting sensor data:');
+    console.log('   Raw relay values:', {
+      relay1_raw: data.relay1,
+      relay2_raw: data.relay2,
+      relay3_raw: data.relay3,
+      relay4_raw: data.relay4
+    });
+    console.log('   Converted relay values:', { relay1, relay2, relay3, relay4 });
+    
     const [result] = await pool.query(
       `INSERT INTO sensor_data (suhu, berat, target, relay1, relay2, relay3, relay4, status, timestamp) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

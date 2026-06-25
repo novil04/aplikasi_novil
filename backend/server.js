@@ -1,3 +1,5 @@
+console.log('🔄 SERVER STARTING - Version 1.0.3-relay-fix - ' + new Date().toISOString());
+
 const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
@@ -49,6 +51,30 @@ let latestData = {
   status: 'DISCONNECTED',
   timestamp: new Date().toISOString()
 };
+
+// Last data received timestamp
+let lastDataTimestamp = Date.now();
+
+// Connection timeout (30 seconds)
+const CONNECTION_TIMEOUT = 30000;
+
+// Check connection status periodically
+setInterval(() => {
+  const now = Date.now();
+  const timeSinceLastData = now - lastDataTimestamp;
+  
+  // If no data received for more than CONNECTION_TIMEOUT, mark as disconnected
+  if (timeSinceLastData > CONNECTION_TIMEOUT && latestData.status !== 'DISCONNECTED') {
+    console.log('⚠️  No data received for', Math.floor(timeSinceLastData / 1000), 'seconds');
+    console.log('   Marking as DISCONNECTED');
+    latestData.status = 'DISCONNECTED';
+    // Optionally reset relay states
+    latestData.relay1 = false;
+    latestData.relay2 = false;
+    latestData.relay3 = false;
+    latestData.relay4 = false;
+  }
+}, 5000); // Check every 5 seconds
 
 // Initialize database on startup
 (async () => {
@@ -148,22 +174,61 @@ mqttClient.on('message', async (topic, message) => {
     try {
       const data = JSON.parse(msg);
       
+      // Debug: log parsed data
+      console.log('📦 Parsed MQTT data:', JSON.stringify(data, null, 2));
+      console.log('   Data type check:', {
+        relay1_type: typeof data.relay1,
+        relay1_value: data.relay1,
+        relay2_type: typeof data.relay2,
+        relay2_value: data.relay2,
+        relay3_type: typeof data.relay3,
+        relay3_value: data.relay3,
+        relay4_type: typeof data.relay4,
+        relay4_value: data.relay4
+      });
+      
       // Get current time in WIB (UTC+7)
       const now = new Date();
       const wibTime = new Date(now.getTime() + (7 * 60 * 60 * 1000));
       
+      // Update last data timestamp
+      lastDataTimestamp = Date.now();
+      
+      // Helper function to map ESP32 status to backend status
+      const mapStatus = (esp32Status) => {
+        if (!esp32Status) return latestData.status;
+        const statusMap = {
+          'SELESAI': 'COMPLETED',
+          'BERJALAN': 'RUNNING',
+          'SCANNING': 'SCANNING',
+          'READY': 'READY',
+          'CONNECTED': 'CONNECTED',
+          'ERROR': 'ERROR'
+        };
+        return statusMap[esp32Status.toUpperCase()] || esp32Status;
+      };
+
       // Update latestData dengan data dari ESP32 (termasuk status relay)
+      // Use explicit check for undefined/null to handle false values correctly
       latestData = {
         suhu: data.suhu || 0,
         berat: data.berat || 0,
         target: data.target || 0,
-        relay1: data.relay1 !== undefined ? data.relay1 : latestData.relay1, // Update dari ESP32
-        relay2: data.relay2 !== undefined ? data.relay2 : latestData.relay2,
-        relay3: data.relay3 !== undefined ? data.relay3 : latestData.relay3,
-        relay4: data.relay4 !== undefined ? data.relay4 : latestData.relay4,
-        status: latestData.status, // Keep current status
+        relay1: (data.relay1 !== undefined && data.relay1 !== null) ? Boolean(data.relay1) : latestData.relay1,
+        relay2: (data.relay2 !== undefined && data.relay2 !== null) ? Boolean(data.relay2) : latestData.relay2,
+        relay3: (data.relay3 !== undefined && data.relay3 !== null) ? Boolean(data.relay3) : latestData.relay3,
+        relay4: (data.relay4 !== undefined && data.relay4 !== null) ? Boolean(data.relay4) : latestData.relay4,
+        status: mapStatus(data.status), // Map ESP32 status to backend status
         timestamp: wibTime.toISOString()
       };
+      
+      console.log('   Final latestData relay values:', {
+        relay1: latestData.relay1,
+        relay2: latestData.relay2,
+        relay3: latestData.relay3,
+        relay4: latestData.relay4,
+        status: latestData.status
+      });
       
       // Save to database
       try {
@@ -305,16 +370,34 @@ aedes.on('publish', async (packet, client) => {
       try {
         const data = JSON.parse(message);
         
+        // Update last data timestamp
+        lastDataTimestamp = Date.now();
+        
+        // Helper function to map ESP32 status to backend status
+        const mapStatus = (esp32Status) => {
+          if (!esp32Status) return latestData.status;
+          const statusMap = {
+            'SELESAI': 'COMPLETED',
+            'BERJALAN': 'RUNNING',
+            'SCANNING': 'SCANNING',
+            'READY': 'READY',
+            'CONNECTED': 'CONNECTED',
+            'ERROR': 'ERROR'
+          };
+          return statusMap[esp32Status.toUpperCase()] || esp32Status;
+        };
+        
         // Update latestData dengan data dari ESP32 (termasuk status relay)
+        // Use explicit check for undefined/null to handle false values correctly
         latestData = {
           suhu: data.suhu || 0,
           berat: data.berat || 0,
           target: data.target || 0,
-          relay1: data.relay1 !== undefined ? data.relay1 : latestData.relay1, // Update dari ESP32
-          relay2: data.relay2 !== undefined ? data.relay2 : latestData.relay2,
-          relay3: data.relay3 !== undefined ? data.relay3 : latestData.relay3,
-          relay4: data.relay4 !== undefined ? data.relay4 : latestData.relay4,
-          status: latestData.status, // Keep current status
+          relay1: (data.relay1 !== undefined && data.relay1 !== null) ? Boolean(data.relay1) : latestData.relay1,
+          relay2: (data.relay2 !== undefined && data.relay2 !== null) ? Boolean(data.relay2) : latestData.relay2,
+          relay3: (data.relay3 !== undefined && data.relay3 !== null) ? Boolean(data.relay3) : latestData.relay3,
+          relay4: (data.relay4 !== undefined && data.relay4 !== null) ? Boolean(data.relay4) : latestData.relay4,
+          status: mapStatus(data.status), // Map ESP32 status to backend status
           timestamp: new Date().toISOString()
         };
         
@@ -466,7 +549,7 @@ app.get('/', (req, res) => {
   res.json({
     status: 'OK',
     message: 'Pengering Ikan Backend Server - MQTT Client Enabled',
-    version: '1.0.1',
+    version: '1.0.3-relay-fix',  // Updated version with relay boolean fix
     uptime: process.uptime(),
     timestamp: new Date().toISOString()
   });
@@ -783,7 +866,7 @@ app.use((err, req, res, next) => {
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log('');
   console.log('='.repeat(60));
-  console.log('🚀 PENGERING IKAN BACKEND SERVER');
+  console.log('🚀 PENGERING IKAN BACKEND SERVER v1.0.3-relay-fix');
   console.log('='.repeat(60));
   console.log(`📡 REST API: http://0.0.0.0:${PORT}`);
   console.log(`🔗 MQTT Broker: ${MQTT_BROKER_URL}`);

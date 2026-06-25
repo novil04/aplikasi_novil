@@ -101,13 +101,21 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
           // Update status dan trigger notifikasi
           String newStatus = data.status;
           
-          // Notifikasi berdasarkan perubahan status
+          // Notifikasi hanya untuk pengeringan selesai
           if (newStatus != _previousStatus) {
-            if (newStatus == 'READY' && _previousStatus != 'READY') {
-              _notificationManager.notifyPengeringanDimulai();
-            } else if (newStatus == 'BERJALAN' && _previousStatus != 'BERJALAN') {
-              _notificationManager.notifyIkanTerdeteksi(berat);
-            } else if (newStatus == 'SELESAI' && _previousStatus != 'SELESAI') {
+            // HAPUS notifikasi untuk status lain
+            // if (newStatus == 'READY' && _previousStatus != 'READY') {
+            //   _notificationManager.notifyPengeringanDimulai();
+            // } else if (newStatus == 'BERJALAN' && _previousStatus != 'BERJALAN') {
+            //   _notificationManager.notifyIkanTerdeteksi(berat);
+            // }
+            
+            // HANYA notifikasi pengeringan selesai
+            if (newStatus == 'SELESAI' && _previousStatus != 'SELESAI') {
+              print('🔔 Dashboard: Status changed to SELESAI');
+              print('   Previous: $_previousStatus → Current: $newStatus');
+              print('   Berat: $berat');
+              print('   Triggering notification...');
               _notificationManager.notifyPengeringanSelesai(berat);
             }
             
@@ -272,6 +280,7 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
   Widget _buildStatusCard() {
     Color statusColor;
     IconData statusIcon;
+    String statusText = statusSistem;
     
     switch (statusSistem) {
       case 'SELESAI':
@@ -297,6 +306,7 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
       case 'DISCONNECTED':
         statusColor = Colors.red;
         statusIcon = Icons.error_outline;
+        statusText = 'TERPUTUS';
         break;
       case 'CONNECTING':
         statusColor = Colors.orange;
@@ -348,7 +358,7 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  statusSistem,
+                  statusText,
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -357,7 +367,9 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  lastStatusMessage,
+                  statusSistem == 'DISCONNECTED' 
+                    ? 'ESP32 tidak terhubung. Periksa koneksi perangkat.'
+                    : lastStatusMessage,
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
@@ -462,7 +474,7 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: status ? iconColor.withOpacity(0.1) : Colors.grey.shade100,
               shape: BoxShape.circle,
@@ -470,29 +482,31 @@ class _DashboardScreenWithApiState extends State<DashboardScreenWithApi> {
             child: Icon(
               icon,
               color: status ? iconColor : Colors.grey,
-              size: 28,
+              size: 24,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               fontWeight: FontWeight.bold,
             ),
             textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               color: status ? iconColor.withOpacity(0.15) : Colors.grey.shade100,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               status ? 'ON' : 'OFF',
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.bold,
                 color: status ? iconColor : Colors.grey,
               ),

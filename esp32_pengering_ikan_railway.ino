@@ -50,8 +50,8 @@ DHT dht(DHTPIN, DHTTYPE);
 // =====================================================
 #define DT1 25
 #define SCK1 26
-#define DT2 32
-#define SCK2 33
+#define DT2 33    // Sesuai dengan kode test yang working
+#define SCK2 32   // Sesuai dengan kode test yang working
 HX711 scale1;
 HX711 scale2;
 
@@ -64,10 +64,10 @@ HX711 scale2;
 #define RELAY_EXHAUST  27  // RELAY4 - Exhaust
 
 // =====================================================
-// KALIBRASI
+// KALIBRASI LOADCELL
 // =====================================================
-float calibration_factor1 = 208.0;
-float calibration_factor2 = 208.0;
+float calibration_factor1 = 709.0;  // Sesuai dengan kode test yang working
+float calibration_factor2 = 709.0;  // Sesuai dengan kode test yang working
 
 // =====================================================
 // VARIABEL
@@ -100,7 +100,7 @@ void setup_wifi() {
   lcd.setCursor(0, 0);
   lcd.print("Connecting WiFi");
   lcd.setCursor(0, 1);
-  lcd.print("Please wait...");
+  lcd.print("Please wait");
   
   Serial.print("Connecting to: ");
   Serial.println(ssid);
@@ -108,14 +108,31 @@ void setup_wifi() {
   WiFi.begin(ssid, password);
   
   int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+  int maxAttempts = 20;
+  
+  // Loop dengan update LCD setiap detik untuk mencegah stuck
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
     delay(500);
     Serial.print(".");
+    
+    // Update LCD setiap 2 attempts (1 detik)
+    if (attempts % 2 == 0) {
+      lcd.setCursor(0, 1);
+      lcd.print("                "); // Clear line
+      lcd.setCursor(0, 1);
+      lcd.print("Wait ");
+      lcd.print(attempts / 2);
+      lcd.print("s/");
+      lcd.print(maxAttempts / 2);
+      lcd.print("s");
+    }
+    
     attempts++;
   }
   
+  Serial.println(); // New line after dots
+  
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println();
     Serial.println("WiFi Connected");
     Serial.print("IP Address : ");
     Serial.println(WiFi.localIP());
@@ -129,7 +146,6 @@ void setup_wifi() {
     lcd.print(WiFi.localIP());
     delay(2000);
   } else {
-    Serial.println();
     Serial.println("WiFi Connection Failed!");
     
     // Tampilkan error di LCD
@@ -231,23 +247,33 @@ void callback(char* topic, byte* payload, unsigned int length) {
       Serial.print("Scale 2 ready: ");
       Serial.println(scale2Ready ? "YES" : "NO");
       
-      if (scale1Ready) {
+      if (scale1Ready && scale2Ready) {
+        // Tare dengan tracking waktu
+        unsigned long tareStart = millis();
         scale1.tare();
+        unsigned long tare1Time = millis() - tareStart;
+        Serial.print("Scale 1 tared in ");
+        Serial.print(tare1Time);
+        Serial.println("ms");
         delay(100);
-        Serial.println("Scale 1 tared");
-      } else {
-        Serial.println("Scale 1 NOT READY - skipping tare");
-      }
-      
-      if (scale2Ready) {
+        
+        tareStart = millis();
         scale2.tare();
+        unsigned long tare2Time = millis() - tareStart;
+        Serial.print("Scale 2 tared in ");
+        Serial.print(tare2Time);
+        Serial.println("ms");
         delay(100);
-        Serial.println("Scale 2 tared");
+        
+        Serial.println("Scales tare complete");
       } else {
-        Serial.println("Scale 2 NOT READY - skipping tare");
+        Serial.println("Scale(s) NOT READY - skipping tare");
+        
+        if (!scale1Ready) Serial.println("Scale 1 not responding");
+        if (!scale2Ready) Serial.println("Scale 2 not responding");
+        
+        client.publish(topicStatus, "WARNING: Scale not ready");
       }
-      
-      Serial.println("Scales tare complete");
       
       modePengeringan    = true;
       pengeringanSelesai = false;
@@ -280,6 +306,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
       tampilReady();
       client.publish(topicStatus, "PENGERINGAN SIAP");
     }
+    // =================================================
+    // TARE COMMAND (Kalibrasi ulang load cell ke 0)
+    // =================================================
+    else if (message == "TARE") {
+      Serial.println("TARE COMMAND received");
+      
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("Taring...");
+      lcd.setCursor(0, 1);
+      lcd.print("Remove all load");
+      
+      delay(2000);
+      
+      bool scale1Ready = scale1.wait_ready_timeout(1000);
+      bool scale2Ready = scale2.wait_ready_timeout(1000);
+      
+      if (scale1Ready && scale2Ready) {
+        scale1.tare(10);
+        delay(100);
+        scale2.tare(10);
+        delay(100);
+        
+        Serial.println("Manual tare successful");
+        client.publish(topicStatus, "TARE COMPLETED");
+        
+        lcd.setCursor(0, 1);
+        lcd.print("Done!           ");
+        delay(1000);
+      } else {
+        Serial.println("TARE FAILED - scales not ready");
+        client.publish(topicStatus, "TARE FAILED");
+        
+        lcd.setCursor(0, 1);
+        lcd.print("Failed!         ");
+        delay(2000);
+      }
+      
+      lcd.clear();
+      tampilReady();
+    }
   }
 }
 
@@ -288,16 +355,25 @@ void callback(char* topic, byte* payload, unsigned int length) {
 // =====================================================
 void reconnect() {
   int attempts = 0;
-  while (!client.connected() && attempts < 3) {
-    Serial.println("Connecting MQTT...");
+  int maxAttempts = 3;
+  
+  while (!client.connected() && attempts < maxAttempts) {
+    Serial.print("Connecting MQTT (attempt ");
+    Serial.print(attempts + 1);
+    Serial.print("/");
+    Serial.print(maxAttempts);
+    Serial.println(")...");
     
-    // Tampilkan status di LCD saat connecting MQTT pertama kali
-    if (attempts == 0 && modePengeringan == false && pengeringanSelesai == false) {
+    // Tampilkan status di LCD dengan update setiap attempt
+    if (modePengeringan == false && pengeringanSelesai == false) {
       lcd.clear();
       lcd.setCursor(0, 0);
       lcd.print("Connecting MQTT");
       lcd.setCursor(0, 1);
-      lcd.print("Please wait...");
+      lcd.print("Attempt ");
+      lcd.print(attempts + 1);
+      lcd.print("/");
+      lcd.print(maxAttempts);
     }
     
     // Generate unique client ID
@@ -326,12 +402,39 @@ void reconnect() {
         lcd.print("System Ready");
         delay(2000);
       }
+      
+      return; // Keluar dari fungsi setelah berhasil connect
     }
     else {
-      Serial.print("MQTT Failed : ");
-      Serial.println(client.state());
+      Serial.print("MQTT Failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" retrying...");
+      
+      // Update LCD menunjukkan gagal
+      if (modePengeringan == false && pengeringanSelesai == false) {
+        lcd.setCursor(0, 1);
+        lcd.print("Failed! Retry...");
+      }
+      
       attempts++;
-      delay(2000);
+      
+      if (attempts < maxAttempts) {
+        delay(2000); // Tunggu sebelum retry
+      }
+    }
+  }
+  
+  // Jika gagal setelah semua attempts
+  if (!client.connected()) {
+    Serial.println("MQTT Connection failed after all attempts");
+    
+    if (modePengeringan == false && pengeringanSelesai == false) {
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("MQTT Failed!");
+      lcd.setCursor(0, 1);
+      lcd.print("Check network");
+      delay(3000);
     }
   }
 }
@@ -389,21 +492,107 @@ void setup() {
   dht.begin();
   delay(100);
   
-  // Setup HX711 - SKIP TARE untuk cepat boot
+  // Setup HX711
   Serial.println("Initializing HX711...");
+  
+  // Inisialisasi HX711 (style kode test yang working)
   scale1.begin(DT1, SCK1);
+  Serial.println("HX711 #1 begin OK");
+  
   scale2.begin(DT2, SCK2);
-  delay(100);
+  Serial.println("HX711 #2 begin OK");
   
   scale1.set_scale(calibration_factor1);
   scale2.set_scale(calibration_factor2);
-  delay(100);
+  Serial.println("Calibration factor applied");
   
-  // SKIP tare - akan dilakukan saat mulai pengeringan
-  // scale1.tare();
-  // scale2.tare();
+  // Update LCD
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Checking scales");
+  lcd.setCursor(0, 1);
+  lcd.print("Please wait...");
   
-  Serial.println("HX711 initialized (tare skipped)");
+  // Menunggu HX711 siap dengan timeout 10 detik (style kode test)
+  Serial.println("Menunggu HX711 siap...");
+  unsigned long startTime = millis();
+  bool scale1Ready = false;
+  bool scale2Ready = false;
+  
+  while ((!scale1.is_ready() || !scale2.is_ready()) && 
+         millis() - startTime < 10000) {
+    
+    scale1Ready = scale1.is_ready();
+    scale2Ready = scale2.is_ready();
+    
+    Serial.print("HX1: ");
+    Serial.print(scale1Ready ? "1" : "0");
+    Serial.print(" | HX2: ");
+    Serial.println(scale2Ready ? "1" : "0");
+    
+    // Update LCD dengan status
+    lcd.setCursor(0, 1);
+    lcd.print("HX1:");
+    lcd.print(scale1Ready ? "OK" : ".."); 
+    lcd.print(" HX2:");
+    lcd.print(scale2Ready ? "OK" : "..");
+    lcd.print("  ");
+    
+    delay(500);
+    
+    // Jika keduanya sudah ready, keluar dari loop
+    if (scale1Ready && scale2Ready) break;
+  }
+  
+  Serial.println();
+  
+  // Check final status
+  scale1Ready = scale1.is_ready();
+  scale2Ready = scale2.is_ready();
+  
+  if (!scale1Ready) {
+    Serial.println("ERROR: HX711 #1 tidak terdeteksi!");
+  } else {
+    Serial.println("HX711 #1 siap");
+  }
+  
+  if (!scale2Ready) {
+    Serial.println("ERROR: HX711 #2 tidak terdeteksi!");
+  } else {
+    Serial.println("HX711 #2 siap");
+  }
+  
+  // Tare hanya jika siap (style kode test)
+  if (scale1Ready) {
+    Serial.println("Tare HX711 #1...");
+    lcd.setCursor(0, 1);
+    lcd.print("Taring scale 1..");
+    scale1.tare();
+    delay(100);
+  }
+  
+  if (scale2Ready) {
+    Serial.println("Tare HX711 #2...");
+    lcd.setCursor(0, 1);
+    lcd.print("Taring scale 2..");
+    scale2.tare();
+    delay(100);
+  }
+  
+  if (scale1Ready || scale2Ready) {
+    lcd.setCursor(0, 1);
+    lcd.print("Tare complete!  ");
+    delay(1000);
+  } else {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Scale Warning!");
+    lcd.setCursor(0, 1);
+    lcd.print("Check wiring");
+    delay(3000);
+  }
+  
+  Serial.println("HX711 Setup selesai");
   
   // Setup Relay (Active LOW)
   pinMode(RELAY_HEATER1, OUTPUT);
@@ -454,13 +643,15 @@ void loop() {
     if (!modePengeringan && !pengeringanSelesai) {
       Serial.println("START PENGERINGAN");
       
-      // Tare HX711 saat mulai pengeringan dengan timeout
+      // Tare HX711 saat mulai pengeringan (style kode test)
       Serial.println("Taring scales...");
       lcd.clear();
       lcd.setCursor(0, 0);
-      lcd.print("Calibrating...");
+      lcd.print("Zeroing...");
       lcd.setCursor(0, 1);
-      lcd.print("Please wait");
+      lcd.print("Remove all load");
+      
+      delay(2000); // Kasih waktu user untuk pastikan rak kosong
       
       // Cek apakah scale ready sebelum tare
       bool scale1Ready = scale1.is_ready();
@@ -471,20 +662,50 @@ void loop() {
       Serial.print("Scale 2 ready: ");
       Serial.println(scale2Ready ? "YES" : "NO");
       
-      if (scale1Ready) {
+      bool tareSuccess = false;
+      
+      if (scale1Ready && scale2Ready) {
+        lcd.setCursor(0, 1);
+        lcd.print("Calibrating...  ");
+        
         scale1.tare();
-        delay(100);
         Serial.println("Scale 1 tared");
+        delay(100);
+        
+        scale2.tare();
+        Serial.println("Scale 2 tared");
+        delay(100);
+        
+        lcd.setCursor(0, 1);
+        lcd.print("Done! Put fish  ");
+        delay(1000);
+        
+        tareSuccess = true;
       } else {
-        Serial.println("Scale 1 NOT READY - skipping tare");
+        if (!scale1Ready) Serial.println("Scale 1 not ready!");
+        if (!scale2Ready) Serial.println("Scale 2 not ready!");
       }
       
-      if (scale2Ready) {
-        scale2.tare();
-        delay(100);
-        Serial.println("Scale 2 tared");
-      } else {
-        Serial.println("Scale 2 NOT READY - skipping tare");
+      if (!tareSuccess) {
+        Serial.println("WARNING: Tare FAILED");
+        
+        lcd.setCursor(0, 1);
+        lcd.print("Scale Error!    ");
+        delay(2000);
+        
+        // Batal start jika scale tidak ready
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Cannot Start!");
+        lcd.setCursor(0, 1);
+        lcd.print("Check scales");
+        delay(3000);
+        
+        lcd.clear();
+        tampilReady();
+        
+        lastButtonState = buttonState;
+        return; // Keluar dari loop, jangan lanjut start
       }
       
       Serial.println("Scales tare complete");
@@ -541,21 +762,14 @@ void loop() {
   float berat1 = 0;
   float berat2 = 0;
   
-  // Cek scale ready dengan timeout untuk menghindari hang
-  if (scale1.wait_ready_timeout(200)) {
-    if (scale1.is_ready()) {
-      berat1 = scale1.get_units(5);
-    }
-  } else {
-    Serial.println("Scale 1 timeout");
+  // Cek dan baca scale 1 (style kode test)
+  if (scale1.is_ready()) {
+    berat1 = scale1.get_units(5);
   }
   
-  if (scale2.wait_ready_timeout(200)) {
-    if (scale2.is_ready()) {
-      berat2 = scale2.get_units(5);
-    }
-  } else {
-    Serial.println("Scale 2 timeout");
+  // Cek dan baca scale 2 (style kode test)
+  if (scale2.is_ready()) {
+    berat2 = scale2.get_units(5);
   }
   
   // =====================================================
@@ -622,6 +836,9 @@ void loop() {
     Serial.println("PENGERINGAN SELESAI");
     client.publish(topicStatus, "PENGERINGAN SELESAI");
     
+    // Kirim data dengan status COMPLETED untuk trigger notifikasi
+    kirimStatusRelay(suhu, berat);
+    
     // Tampilkan selesai selama 5 detik
     lcd.clear();
     lcd.setCursor(0, 0);
@@ -674,20 +891,35 @@ void loop() {
   }
   
   // =====================================================
-  // RELAY CONTROL berdasarkan suhu
-  // Heater 1 & 2 ON, Fan ON
-  // Exhaust ON jika suhu >= 60°C
+  // RELAY CONTROL berdasarkan status dan suhu
+  // Relay HANYA ON setelah berat_awal & target tersimpan
   // =====================================================
-  digitalWrite(RELAY_HEATER1, LOW);  // HEATER 1 ON
-  digitalWrite(RELAY_HEATER2, LOW);  // HEATER 2 ON
-  digitalWrite(RELAY_FAN, LOW);      // FAN ON
-  
-  // Exhaust kontrol otomatis berdasarkan suhu
-  if (suhu >= 60.0) {
-    digitalWrite(RELAY_EXHAUST, LOW);  // EXHAUST ON
-    Serial.println("EXHAUST ON (Suhu >= 60C)");
+  if (beratTersimpan) {
+    // Berat sudah tersimpan, mulai pengeringan
+    
+    // FAN selalu ON saat pengeringan
+    digitalWrite(RELAY_FAN, LOW);  // FAN ON
+    
+    // Kontrol HEATER dan EXHAUST berdasarkan suhu
+    if (suhu >= 60.0) {
+      // Suhu sudah tinggi (≥60°C)
+      digitalWrite(RELAY_HEATER1, HIGH); // HEATER 1 OFF
+      digitalWrite(RELAY_HEATER2, HIGH); // HEATER 2 OFF
+      digitalWrite(RELAY_EXHAUST, LOW);  // EXHAUST ON untuk buang panas
+      Serial.println("Suhu >= 60C: HEATER OFF, EXHAUST ON");
+    } else {
+      // Suhu masih rendah (<60°C)
+      digitalWrite(RELAY_HEATER1, LOW);  // HEATER 1 ON
+      digitalWrite(RELAY_HEATER2, LOW);  // HEATER 2 ON
+      digitalWrite(RELAY_EXHAUST, HIGH); // EXHAUST OFF
+      Serial.println("Suhu < 60C: HEATER ON, EXHAUST OFF");
+    }
   } else {
-    digitalWrite(RELAY_EXHAUST, HIGH); // EXHAUST OFF
+    // Masih scanning berat, relay tetap OFF
+    digitalWrite(RELAY_HEATER1, HIGH);  // HEATER 1 OFF
+    digitalWrite(RELAY_HEATER2, HIGH);  // HEATER 2 OFF
+    digitalWrite(RELAY_FAN, HIGH);      // FAN OFF
+    digitalWrite(RELAY_EXHAUST, HIGH);  // EXHAUST OFF
   }
   
   // =====================================================
@@ -737,7 +969,19 @@ void kirimStatusRelay(float suhu, float berat) {
   bool fan_on = (digitalRead(RELAY_FAN) == LOW);
   bool exhaust_on = (digitalRead(RELAY_EXHAUST) == LOW);
   
-  // Format JSON dengan status relay
+  // Tentukan status string
+  String statusString = "UNKNOWN";
+  if (pengeringanSelesai) {
+    statusString = "SELESAI";
+  } else if (modePengeringan && beratTersimpan) {
+    statusString = "BERJALAN";
+  } else if (modePengeringan && !beratTersimpan) {
+    statusString = "SCANNING";
+  } else {
+    statusString = "READY";
+  }
+  
+  // Format JSON dengan status relay DAN status
   String payload = "{";
   payload += "\"suhu\":" + String(suhu, 1) + ",";
   payload += "\"berat\":" + String(berat, 0) + ",";
@@ -745,7 +989,8 @@ void kirimStatusRelay(float suhu, float berat) {
   payload += "\"relay1\":" + String(heater1_on ? "true" : "false") + ",";
   payload += "\"relay2\":" + String(heater2_on ? "true" : "false") + ",";
   payload += "\"relay3\":" + String(fan_on ? "true" : "false") + ",";
-  payload += "\"relay4\":" + String(exhaust_on ? "true" : "false");
+  payload += "\"relay4\":" + String(exhaust_on ? "true" : "false") + ",";
+  payload += "\"status\":\"" + statusString + "\"";
   payload += "}";
   
   // Publish ke topic data
